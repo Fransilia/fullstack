@@ -1,0 +1,6 @@
+selain->palvelin: HTTP POST https://fullstack-exampleapp.herokuapp.com/new_note_spa
+palvelin-->selain: 201 Created
+note left of palvelin
+palvelin vastaa 
+{"message":"note created"}
+end note
