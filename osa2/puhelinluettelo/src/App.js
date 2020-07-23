@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import personService from './services/persons'
+import './index.css'
 
 const FilterNames = (props) => { 
   return (
   <div>
-  <h1>Phonebook</h1>
   <p>filter shown with
   <input value={props.filterString}
   onChange={props.handleFilterChange}
@@ -37,7 +37,8 @@ const PersonForm = (props) => {
   )
 }
 
-const Persons = ({filteredPersons}) => {
+const Persons = ({filteredPersons, removePerson}) => {
+  
   return (
     <div>
       <h2>Numbers</h2>
@@ -45,10 +46,36 @@ const Persons = ({filteredPersons}) => {
       {filteredPersons.map((person, i) =>
         <li key={i} >
           {person.name} {person.number}
+          <button onClick={(e)=>removePerson(i)}>delete</button>
         </li>
         )}
       </ul>
     </div>
+  )
+}
+
+const Notification = ({ message }) => {
+  if (message === null) {
+    return null
+  }
+
+  return (
+    <div className="info">
+      {message}
+    </div>
+  )
+}
+
+const ErrorNotification = ({ message }) => {
+  if (message === null) {
+    return null
+  }
+
+  return (
+    <div className="error">
+      {message}
+    </div>
+
   )
 }
 
@@ -57,17 +84,35 @@ const App = () => {
   const [ newName, setNewName ] = useState('')
   const [newNumber, setNewNumber ] = useState('')
   const [filterString, setFilterString] = useState('')
+  const [infoMessage, setinfoMessage] = useState(null)
+  const [errorMessage, setErrorMessage] = useState(null)
 
-  const hook = () => {
-    console.log('effect')
-    axios
-      .get('http://localhost:3001/persons')
+  const removePerson = (i) => {
+    console.log('person that needs to be removed ' + i)
+    const personid = persons[i].id
+    const name = persons[i].name
+    if (window.confirm('Do you want to delete '+ name + '?')) {
+      personService.remove(personid)
+        .then(response => {
+          const personsLeft = persons.filter(p => p.id !== personid)
+          setPersons(personsLeft)
+        })
+        setinfoMessage(
+          name + ' has been removed'
+        )
+        setTimeout(() => {
+          setinfoMessage(null)
+        }, 4000)
+    }
+  }
+
+  useEffect(() => {
+    personService
+      .getAll()
       .then(response => {
-        console.log('promise fulfilled')
         setPersons(response.data)
       })
-  }
-  useEffect(hook, [])
+  }, [])
 
   console.log('render', persons.length, 'persons')
 
@@ -79,11 +124,57 @@ const App = () => {
         name: newName ,
         number: newNumber
       }
-      setPersons(persons.concat(nameObject))
-      setNewName('')
-      setNewNumber('')
+
+      personService
+        .create(nameObject)
+        .then(response => {
+          console.log(response)
+          setPersons(persons.concat(response.data))
+          setNewName('')
+          setNewNumber('')
+          setinfoMessage(
+          newName + ' has been added'
+        )
+        setTimeout(() => {
+          setinfoMessage(null)
+        }, 4000) 
+        }) 
+          
     } else {
-      window.alert(newName + ' is already in the phonebook')
+      if (window.confirm(newName + ' is already in the phonebook, replace old number with a new one?')) {
+         const nameObject = {
+           name: newName,
+           number: newNumber
+         } 
+
+        const existingid = persons[existing].id
+        personService
+          .update(existingid,nameObject)
+          .then(response => {
+            console.log(response)
+            persons[existing].number = newNumber
+            setPersons(persons)
+            setNewNumber('')
+            setNewNumber('')
+            setinfoMessage(
+              newName + ' has been updated'
+            )
+            setTimeout(() => {
+              setinfoMessage(null)
+            }, 4000)
+          })
+          .catch(error => {
+            console.log('fail:' , error)
+            setErrorMessage (
+              'Information of ' + newName + ' has alredy been removed from server'
+            )
+            setTimeout(() => {
+              setErrorMessage(null)
+            }, 4000)
+          }) 
+          
+        } 
+        
     }
   }
 
@@ -110,6 +201,9 @@ const App = () => {
 
   return (  
     <div>
+      <h1>Phonebook</h1>
+      <Notification message={infoMessage} />
+      <ErrorNotification message={errorMessage} />
       <FilterNames
       filterString = {filterString}
       handleFilterChange = {handleFilterChange}/>
@@ -119,7 +213,10 @@ const App = () => {
       newNumber={newNumber}
       handleNumberChange={handleNumberChange}
       />
-      <Persons filteredPersons={filteredPersons}/>
+      <Persons 
+      filteredPersons={filteredPersons}
+      removePerson={removePerson}
+      />
     </div>
   )
 }
